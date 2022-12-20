@@ -1,6 +1,4 @@
 
-// CMSC 341 - Fall 2020 - Project 0
-
 //mytest.cpp: a c++ file that tests the copy constructor and assignment
 //            operator making sure that they work perfectly.
 
