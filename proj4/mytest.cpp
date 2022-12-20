@@ -1,0 +1,222 @@
+# include <iostream>
+# include "hash.h"
+# include "car.h"
+# include <chrono>
+# include <time.h>
+
+const char* FAIL_STATEMENT = "*****TEST FAILED: ";
+const char* PASS_STATEMENT = "     TEST PASSED: ";
+
+// Prototype for 16 bit cyclic hash function; implementation is after
+// main().
+unsigned cyclic_hash16(string key);
+
+void time_tests();
+
+int main() {
+
+  // Create a vector of cars to insert in the hash table
+  vector<Car> cars;
+  cars.push_back(Car("x101", 5, "super car"));
+  cars.push_back(Car("x101", 12, "mega car"));
+  cars.push_back(Car("x101", 4, "shack of cars"));
+  cars.push_back(Car("challenger", 10, "mega car"));
+  cars.push_back(Car("challenger", 5, "car world"));
+  cars.push_back(Car("stratos", 7, "car world"));
+  cars.push_back(Car("stratos", 15, "super car"));
+  cars.push_back(Car("stratos", 8, "shack of cars"));
+  cars.push_back(Car("challenger", 3, "car joint"));
+  cars.push_back(Car("gt500", 3, "shack of cars"));
+  cars.push_back(Car("miura", 28, "mega car"));
+  cars.push_back(Car("gt500", 11, "super car"));
+
+  // Create the hash table of length 10 using cyclic_hash function
+  HashTable<Car> ht(10, cyclic_hash16);
+
+  vector<Car>::iterator itCar;
+  for (itCar=cars.begin();itCar!=cars.end();itCar++)
+    ht.insert(*itCar);
+
+  cout << "\nDump of ht:\n";
+  ht.dump();
+  cout << endl;
+
+  for (int i = 0; i < 50 ; i++){
+    cout << "-";
+  }
+  cout << endl;
+  
+  cout << "Testing copy and assignment operators: \n";
+  HashTable<Car> ht2(ht);
+
+  HashTable<Car> ht3 = ht;
+
+  // dumping both hash tables to be sure they're copied correctly
+  // deep copies and all
+  Car d;
+  cout << "\nGet next '" << "gt500" << "' order...\n";
+  if ( ht.getNext("gt500", d) ) {
+    cout << "  " << d << endl;
+  }
+  
+  cout << "\nDump of ht2:\n";
+  ht2.dump();
+  cout << "\nDump of ht3:\n";
+  ht3.dump();
+
+  cout << "\nDump of ht to compare:\n";
+  ht.dump();
+
+  ht.insert(d);
+
+  if (ht2.tableSize() == ht3.tableSize()){
+    cout << PASS_STATEMENT << "copy constructor and assignment operator work perfectly" << endl;
+  }
+
+  cout << endl;
+
+  // testing heap functions
+  for (int i = 0; i < 50 ; i++){
+    cout << "-";
+  }
+  cout << endl;
+  cout << "Testing exceptions, insertions and removals in a heap: \n" << endl;
+  
+  try{
+    Heap<Car> table;
+    for (itCar=cars.begin();itCar!=cars.end();itCar++)
+      table.insert(*itCar);
+
+    for (unsigned int i = 0; i < 100; i++){
+      table.readTop();
+      table.removeTop();
+    }
+      
+    
+  }
+  catch (range_error &ex){
+    cout << "You tried to access an inexistent object from empty array" << endl;
+    cout << PASS_STATEMENT << "An exception was thrown when an ";
+    cout << "inexistent object was tried to be accessed from an ";
+    cout << "empty heap was tried" << endl;
+      
+  }
+
+  cout << endl;
+
+  time_tests();
+  
+  // testing insertion, removal and collisions in a hash table
+  Car d2, d3;
+  int index = 0;
+  for (int i = 0; i < 50 ; i++){
+    cout << "-";
+  }
+  cout << endl;
+  cout << "Testing collisions, insertions and removals in a hash table \n" << endl;
+  
+  while (ht2.numEntries() < ht2.tableSize()){
+    
+    ht2.getNext("stratos", d);
+    ht2.getNext("stratos", d2);
+    ht2.getNext("stratos", d3);
+    
+    ht2.insert(d);
+    ht2.insert(d2);
+    ht2.insert(d3);
+    
+    ht2.dump();
+    cout << endl;
+  
+    index++;
+  }
+
+  cout << PASS_STATEMENT << "New heaps are created every time a used heap is emptied even if ";
+  cout << "the heasp contained objects of the same key in the past" << endl;
+  cout << endl;
+
+  // testing if the max order is maintained in a heap
+  for (int i = 0; i < 50 ; i++){
+    cout << "-";
+  }
+  cout << endl;
+  cout << "Testing heap maintenance \n" << endl;
+  cout << "Since stratos is not exactly in order, use that heap to prove heap maintenance \n";
+  cout << "\nGet next '" << "stratos" << "' order...\n";
+  if ( ht.getNext("stratos", d) ) {
+    cout << "  " << d << endl;
+  }
+
+  cout << "Dumping ht after removing an object from stratos heap: \n";
+  ht.dump();
+
+  cout << endl;
+
+  
+  return 0;
+
+}
+
+unsigned cyclic_hash16(string key) {
+  unsigned usize = 16;
+  unsigned s = 5; // shift by 5
+  unsigned h = 0;
+  for ( int i = 0; i < key.length(); i++ ){
+    h = (( h << s ) | ( h >> (usize - s) ));
+    h += key[i];
+    h = h & 0xffff;
+  }
+  return h;
+}
+
+void time_tests(){
+
+  for (int i = 0; i < 50 ; i++){
+    cout << "-";
+  }
+  cout << endl;
+  // showing how insert and remove top operate at O(log n)
+
+  cout << "Time tests for different number of inserts to show";
+  cout << " insert and remove top functions in the heap class";
+  cout << "run at O(log n)" << endl;
+    
+  int inserts = 1000;
+  
+  Heap<Car> table;
+  
+  clock_t start, end; 
+  
+  while (inserts < 8000){
+
+    start = clock();
+    
+    for (int i = 0; i < inserts; i++){
+      table.insert(Car());      
+    }
+
+    end = clock();
+    
+    double time_taken = double(end - start) / double(CLOCKS_PER_SEC);
+    
+    cout << "Time taken to insert " << inserts << " cars is :" << time_taken << endl;
+    
+    start = clock();
+    
+    for (int i = 0; i <= table.size(); i++){
+      table.removeTop();
+    }
+
+    end = clock();
+
+    time_taken = double(end - start) / double(CLOCKS_PER_SEC);
+    
+    cout << "Time taken to remove " << inserts << " cars is :" << time_taken << endl;
+    
+    inserts *= 2;
+
+    cout << endl;
+  }
+
+  
+}

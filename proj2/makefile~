@@ -1,0 +1,14 @@
+CXX = g++
+CXXFLAGS = -Wall -g
+
+driver: wordTree.o bNode.o bookTree.o
+	$(CXX) $(CXXFLAGS) -c driver.cpp
+
+wordTree.o: wordTree.cpp wordTree.h
+	$(CXX) $(CXXFLAGS) -c wordTree.cpp
+
+bNode.o: bNode.cpp bNode.h wordTree.h
+	$(CXX) $(CXXFLAGS) -c bNode.cpp
+bookTree: bookTree.h bNode.h wordTree.h
+
+

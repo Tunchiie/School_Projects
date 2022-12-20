@@ -1,0 +1,380 @@
+// CMSC 341 - Fall 2020 - Project 3
+/// PQueue: an ER triage queue using a skew heap and function pointers
+
+#include "pqueue.h"
+using namespace std;
+using std::cout;
+using std::endl;
+using std::domain_error;
+
+PQueue::PQueue(prifn_t priFn) {
+  
+  //set all private members to their initial values
+  _size = 0;
+  priority = priFn;
+  _heap = nullptr;
+  
+}
+
+PQueue::~PQueue() {
+
+  clear();
+  _size = 0;
+}
+
+PQueue::PQueue(const PQueue& rhs) {
+
+  // initialize all private members to their corresponding members
+  // in the copy
+  _size = rhs._size;
+  _heap = nullptr;
+  setPriorityFn (rhs.priority);
+  
+  // make a deep copy of the rhs queue
+  _heap = copy(rhs._heap);
+ 
+       
+}
+
+
+PQueue& PQueue::operator=(const PQueue& rhs) {
+
+  if (this != &rhs){
+    
+    // initialize the private members to their corresponding
+    // memebers and make a deep copy of the heap
+    _size = rhs._size;
+    
+    // clear the heap in preparation to make a new one
+    clear();
+    
+    // set priority
+    setPriorityFn (rhs.priority);
+    
+    // make deep copies of rhs queue
+    _heap = copy(rhs._heap);
+  }
+  return *this;
+}
+
+void PQueue::insertPatient(const Patient& input) {  
+
+  // initialize the heap to a pointer if it is currently
+  // empty
+  if (_heap == nullptr){
+    _heap = new Node(input);
+    _size++;
+  }
+
+  //create a new heap and merge both heaps 
+  else{
+    
+    Node* temp_ptr = new Node(input);
+
+    _heap = mergeWithHelper(_heap, temp_ptr);
+
+    _size++;
+    
+  }
+}
+
+Patient PQueue::getNextPatient() {
+
+  
+  // if the heap is empty, throw an exception
+  if (_heap == nullptr){
+    
+    throw domain_error ("     queue is empty");
+  }
+
+  // extract the patient from the root and delete the pointer
+  // then merge both left and right heaps to become a new heap
+  else{
+    
+    Node *temp_ptr = _heap;
+
+    Patient patient = temp_ptr->_patient;
+    
+    _heap = mergeWithHelper(_heap->_left, _heap->_right);
+    
+    if (temp_ptr != nullptr){
+
+      _size--;
+      
+      delete temp_ptr;
+      
+      temp_ptr = nullptr;
+    }
+
+        
+    
+    return patient;
+  }
+}
+
+
+void PQueue::mergeWithQueue(PQueue& rhs) {
+  
+
+  //check if the same heap is being merged
+  if ((this != &rhs) && rhs._heap){
+    
+    // make a deep copy of the heap then merge the copy
+    // with the resident heap
+    if (priority == rhs.priority){
+      
+      Node* temp_ptr = copy(rhs._heap);
+      
+      _heap = mergeWithHelper(_heap, temp_ptr);
+      
+      //update size of the new heap
+      _size += rhs._size;
+      
+      while (rhs.numPatients() > 0){
+        rhs.getNextPatient();
+      }
+
+    }
+    
+    else{
+      throw domain_error ("     Priority functions are not the same");
+    }
+  }
+  
+  
+}
+
+Node* PQueue::mergeWithHelper (Node* queue_ptr, Node* rhs_ptr){
+  
+  
+  // check if any of the two heaps are empty
+  if (queue_ptr == nullptr)
+    
+    return rhs_ptr;
+  
+  else if (rhs_ptr == nullptr){
+
+    return queue_ptr;
+  }
+
+  
+  Node* temp_ptr = nullptr;
+
+  // merge them based on ther priotity
+  if(priority(rhs_ptr->_patient) < priority(queue_ptr->_patient)){
+
+    temp_ptr = queue_ptr;
+
+    queue_ptr = rhs_ptr;
+    
+    rhs_ptr = temp_ptr;
+    
+  }
+
+  // if they have the same priority, insert the new one at the root
+  else if(priority(rhs_ptr->_patient) == priority(queue_ptr->_patient)){
+    
+    if ((rhs_ptr->_patient.getPatient()) > (queue_ptr->_patient.getPatient())){
+
+      temp_ptr = queue_ptr;
+
+      queue_ptr = rhs_ptr;
+
+      rhs_ptr = temp_ptr;
+
+    }
+
+  }
+
+  // swap left and right nodes of the root then merge
+  // the new heap and the new left node
+  temp_ptr = queue_ptr->_left;
+  
+  queue_ptr->_left = queue_ptr->_right;
+  
+  queue_ptr->_right = temp_ptr;
+  
+  queue_ptr->_left = mergeWithHelper(rhs_ptr, queue_ptr->_left);
+  
+  
+  return queue_ptr;
+
+    
+  
+}
+
+void PQueue::clear() {
+  
+  if (_heap != nullptr){
+    //clear the heap using helper function
+    clear(_heap);
+  }
+    
+  
+}
+
+
+int PQueue::numPatients() const {
+
+  // return the number of patients in the queue
+  return _size;
+}
+
+void PQueue::printPatientQueue() const {
+
+  //print all atients in queue using preorder implementation
+  if (_heap != nullptr)
+    cout << *_heap << endl;
+    preorder(_heap);
+    cout << endl;
+  
+  
+}
+
+// prints the queue in order by visiting the left and right
+//      then going down the queue
+void PQueue::preorder(Node* node) const{
+
+  //VLR
+  if (node != nullptr){
+    
+    if (node->_left != nullptr){
+      cout << *node->_left << endl;
+      preorder(node->_left);
+      
+    }
+    
+    if (node->_right != nullptr){
+      cout << *node->_right << endl;
+      preorder(node->_right);
+      
+    }
+  }
+}
+
+// returns the priorrity used to order the queue
+prifn_t PQueue::getPriorityFn() const {
+  
+  //return priority function used to order the queue
+  return priority;
+}
+
+// sets the priority of the queue then reorders queue
+void PQueue::setPriorityFn(prifn_t priFn) {
+
+  // reinitialize priority as new priority
+  priority = priFn;
+
+  // if the heap is not empty, reorder the entire heap
+  if (_heap != nullptr){
+
+    PQueue temp(priority);
+    
+    copy(temp);
+
+    // set the heap to the new reordered heap
+    _heap = temp._heap;
+
+    // set the dummy queue heaap to null so the destructor
+    // for dummy doesn't destroy the new heap and since it
+    // eventually deletes all pointers, no memory is leaked
+    temp._heap = nullptr;
+
+    //update size
+    _size = temp._size;
+
+  }
+  
+
+  
+  
+}
+
+void PQueue::clear (Node*& node){
+
+  // clear both left and right nodes recursively
+  if (node != nullptr){
+    
+    if (node->_left != nullptr)
+      clear(node->_left);
+    if (node->_right != nullptr)
+      clear(node->_right);
+    delete node;
+    node = nullptr;
+  }
+  
+}
+ 
+Node* PQueue::copy(PQueue& temp){  
+
+  // delete old nodes and create a new heap
+  // based on the new priiority function
+  if (_heap != nullptr){
+
+    Patient patient = getNextPatient();
+
+    temp.insertPatient(patient);
+    
+    copy(temp);
+  }
+
+  
+
+  return temp._heap;
+  
+}
+
+Node* PQueue::copy(Node* const node){
+
+  // copy the whole heap in the same order
+  // of the sent in heap
+  if (node == nullptr){
+
+    return node;
+
+  }
+  else{
+
+    Node* temp_ptr = new Node(node->_patient);
+
+    temp_ptr->_left = copy(node->_left);
+    
+    temp_ptr->_right = copy(node->_right);
+    
+    return temp_ptr;
+  }
+  
+  
+}
+void PQueue::dump() const{
+  
+  inorder(_heap);
+
+  cout << endl;
+}
+
+void PQueue::inorder(Node* node) const{
+
+
+  //LVR
+  if (node != nullptr){
+    cout << "(";
+    inorder(node->_left);
+    cout << priority(node->_patient) << ":" << node->_patient.getPatient();
+    inorder(node->_right);
+    cout << ")";
+  }
+}
+
+ostream& operator<<(ostream& sout, const Patient& patient) {
+  sout << "Patient: " << patient.getPatient() << ", triage: " << patient.getTriage()
+       << ", temperature: " << patient.getTemperature() << ", oxygen: " << patient.getOxygen() << ", RR: "
+       << patient.getRR() << ", HR: " << patient.getHR() << ", BP: " << patient.getBP();
+  return sout;
+}
+
+ostream& operator<<(ostream& sout, const Node& node) {
+  sout << node.getPatient();
+  return sout;
+}
+

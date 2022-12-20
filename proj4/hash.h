@@ -1,0 +1,325 @@
+
+// CMSC 341 - Fall 2020 - Project 4
+// hash.h
+
+// Templated, hash table implementation.  Each buckets is a heap.  A
+// bucket contains objects with the same key values stored as a
+// max-heap based on priority.  Collisions are resolved by linear
+// probing.
+
+// To work with Heap and HashTable, the template class T must provide
+// the following:
+//  (a) Default constructor
+//  (b) priority function (unsigned priority())
+//  (c) key function (string key())
+//  (d) overloaded insertion operator
+
+#ifndef _HASH_H
+#define _HASH_H
+
+#include <string>
+#include "heap.h"
+
+using std::string;
+
+// Hash function typedef.  The hash function must return an 'unsigned
+// int' value.  Reduction mod N is the responsiblity of the caller,
+// not the hash function.
+typedef unsigned (*hash_fn)(string);
+
+class Grader;
+
+template <class T>
+class HashTable {
+
+  friend Grader;
+  
+ public:
+  // Constructor.  Requires table size and hash function.
+  HashTable(unsigned size, hash_fn hash);
+
+  // Destructor, copy, and assignment
+  ~HashTable();
+  HashTable(const HashTable<T>& ht);
+  const HashTable<T>& operator=(const HashTable<T>& ht);
+
+  // In-line functions
+  
+  // Table size; set by constructor
+  unsigned tableSize() const { return _N; }
+  // Number of entries in the table
+  unsigned numEntries() const { return _n; }
+  // Load factor
+  float lambda() const { return ((float) _n) / _N; }
+
+  // Main hash table functions
+  
+  // insert returns 'true' if successful; 'false' otherwise
+  bool insert(const T& object);
+  // getNext retrieves **and removes** the highest priority order of
+  // type indicated by key.  It returns 'true' if successful; 'false'
+  // otherwise.
+  bool getNext(string key, T& obj);
+
+  // Dump the entire hash table
+  void dump() const;
+  
+ private:
+  unsigned _N;       // hash table size
+  unsigned _n;       // current number of entries
+  hash_fn _hash;     // hash function
+  Heap<T> *_table;   // array of heaps
+
+  // ***********************************************
+  // Private helper function declarations go here! *
+  // ***********************************************
+  
+};
+
+// *****************************************
+// Templated function definitions go here! *
+// *****************************************
+template <class T>
+HashTable<T>::HashTable(unsigned int size, hash_fn hash){
+
+  // initialize private variables
+  _N = size;
+  _hash = hash;
+  _table = new Heap<T>[size];
+  _n = 0;
+}
+
+template <class T>
+HashTable<T>::~HashTable(){
+  
+  // destroy the hash table/ array
+  delete [] _table;
+
+}
+
+template <class T>
+HashTable<T>::HashTable(const HashTable<T>& ht){
+
+
+  // deep copy private variables and hash table
+  _hash = ht._hash;
+
+  _N = ht._N;
+
+  _n = ht._n;
+  
+  _table = new Heap<T>[_N];
+
+  for (unsigned i = 0; i < _N; i++){
+    _table[i] = ht._table[i];
+  }
+  
+
+  
+}
+
+template <class T>
+const HashTable<T>& HashTable<T>::operator=(const HashTable<T>& ht){
+
+  if (this != ht){
+
+    // empty the hash table
+    delete [] _table;
+
+    // deep copy private variables and hash table
+    _hash = ht._hash;
+    
+    _N = ht._N;
+    
+    _n = ht._n;
+        
+    _table = new Heap<T>[_N];
+    
+    for (unsigned i = 0; i < _N; i++){
+      _table[i] = ht._table[i];
+    }
+  }
+  
+  return *this;
+}
+
+template <class T>
+bool HashTable<T>::insert(const T& object){
+
+  // use hash function to get key for object
+  unsigned index = _hash(object.key()) % tableSize();
+    
+  // if that index is not used then insert
+  if (!_table[index].used()){
+    
+    _table[index].insert(object);
+    
+    _n++;
+    
+    return true;
+  }
+  
+  else{
+    
+    // insert at that index only if the keys are the same
+    // and heap is not empty
+    if (!_table[index].empty()){
+      
+      if (object.key() == _table[index].readTop().key()){
+	
+	_table[index].insert(object);
+	  
+	return true;
+      }
+    }
+    
+    else{
+      
+      // traverse the whole array of heaps
+      int num_traversals = 0;
+      
+      // while the table is not full, find an index to
+      // insert into
+      while (index < _N){
+	
+	// checks if the heap is used and not empty
+	if (_table[index].used() && !_table[index].empty()){
+	  
+	  // checks if the objecct to be inserted has
+	  // the same key as the residents of that heap 
+	  if (object.key() == _table[index].readTop().key()){
+	    
+	    _table[index].insert(object);
+	    
+	    return true;
+	    
+	  }
+	  
+	  else{
+	    
+	    index++;
+	    
+	  }
+	  
+	}
+	
+	else{
+	  
+	  // insert into a heap if it has not been used
+	  if (!_table[index].used()){
+	    
+	    _table[index].insert(object);
+	    
+	    _n++;
+	      
+	    return true;
+	  }
+	  
+	  // if the indices to the right has been checked
+	  // then start at the beginning to check for empty indices
+	  else if ((index == (_N - 1)) && \
+		   num_traversals < 1){
+	    
+	    index = 0;
+	    
+	    num_traversals++;
+	  }
+	  
+	  else{
+	    
+	    index++;
+	    
+	  }
+	  
+	}
+	  
+      }
+      
+    }
+    
+  }
+  
+  
+  return false;
+}
+
+template <class T>
+bool HashTable<T>::getNext(string key, T& obj){
+
+  // get the object corresponding to the key
+  unsigned index = _hash(key) % tableSize();
+  
+  if (index < tableSize()){
+    
+    // if table is empty then the key doesn't exist in table
+    // or is in another index
+    // if key is found, get the highest priority object
+    if (!_table[index].empty() &&		\
+	_table[index].readTop().key() == key){
+      
+      obj = _table[index].readTop();
+      
+      _table[index].removeTop();
+      
+      return true;
+    }
+    
+    
+    else{
+      
+      
+      int num_traversals = 0;
+      
+      while (index < _N){
+	
+	// check if the index is not empty and
+	// it has objects of the same key
+	if (!_table[index].empty() &&\
+	    _table[index].readTop().key() == key){
+	  
+	  obj = _table[index].readTop();
+	  
+	  _table[index].removeTop();
+	  
+	  return true;
+	}
+	
+	// check from the beginning of array if thw whole
+	// array has been checked
+	else if ((index == (_N - 1)) && \
+		 num_traversals < 1){
+	  
+	  index = 0;
+	  
+	  num_traversals++;
+	}
+	
+	else{
+	  
+	  index++;
+	}
+      }
+      
+    }
+    
+    
+    
+    
+  
+  }
+
+  return false;
+}
+template <class T>
+void HashTable<T>::dump() const{
+
+  // dump all objects contained in each bucket
+  for (unsigned i = 0; i < tableSize(); i++){
+    cout << "[" << i << "]" << endl;
+    if (_table[i].used()){
+      
+      _table[i].dump();
+    }
+  }
+}
+#endif
